@@ -652,7 +652,7 @@ const animes = [
     {
       id: 43,
       title: "Fairy Tail",
-      img: "https://static.wikia.nocookie.net/fairy-tail/images/5/53/Arc_Arbaless_Anime.png/revision/latest?cb=20190413140925&path-prefix=fr",
+      img: "https://www.nautiljon.com/images/anime/00/21/fairy_tail_2014_3012.webp",
       episodes: 2,
       description: "Description du nouvel anime ajouté.",
       genres: ["Action", "Aventure", "Comédie", "Drame", "Shonen", "Fantaisie"],
