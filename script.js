@@ -432,7 +432,7 @@ const animes = [
     {
       id: 28,
       title: "Fire Force (Saison 1)",
-      img: "https://static.wikia.nocookie.net/fireforce/images/6/61/Affiche.jpg/revision/latest?cb=20210312130446&path-prefix=fr",
+      img: "https://static.thcdn.com/images/large/original//productimg/1600/1600/12457217-1145030661283719.jpg",
       episodes: 2,
       description: "Description du nouvel anime ajouté.",
       genres: ["Action", "Drame", "Comédie", "Shonen"],
