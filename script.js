@@ -1591,17 +1591,17 @@ const animes = [{
 ];
 
 const availableAvatars = [
-  'avatars/avatar1.png', 'avatars/avatar2.png', 'avatars/avatar3.png',
-  'avatars/avatar4.png', 'avatars/avatar5.png', 'avatars/avatar6.png'
+  'avatar1.png', 'avatar2.png', 'avatar3.png',
+  'avatar4.png', 'avatar5.png', 'avatar6.png'
 ];
 // Dans script.js, sous la liste availableAvatars
 const availableBanners = [
-  'banners/banner1.jpg',
-  'banners/banner2.jpg',
-  'banners/banner3.jpg',
-  'banners/banner4.jpg',
-  'banners/banner5.jpg',
-  'banners/banner6.jpg'
+  'banner1.jpg',
+  'banner2.jpg',
+  'banner3.jpg',
+  'banner4.jpg',
+  'banner5.jpg',
+  'banner6.jpg'
   // Ajoute ici les chemins vers toutes tes images de bannière
 ];
 
