@@ -69,6 +69,8 @@ const sortiesDuJour = {
 // =================================================================================
 // --- 2. FONCTIONS UTILITAIRES (HELPERS) ---
 // =================================================================================
+const getTop5 = () => JSON.parse(localStorage.getItem('shinime_top5') || '[]');
+const saveTop5 = (top5Array) => localStorage.setItem('shinime_top5', JSON.stringify(top5Array));
 function findAdjacentSeasons(currentAnime) {
 	const title = currentAnime.title;
 	// On cherche un motif comme "(Saison 2)" ou "(Saison 1 Partie 2)"
@@ -174,13 +176,148 @@ function addToHistory(animeId) {
 	if (history.length > 10) history = history.slice(0, 10);
 	localStorage.setItem('animeHistory', JSON.stringify(history));
 }
+// Dans script.js, section 2
 
+function exportUserData() {
+    const userData = {};
+    const keysToExport = [
+        'animeFavorites', 'shinime_watchlist', 'animeProgress', 
+        'shinime_watched', 'animeHistory', 'shinime_achievements',
+        'shinime_pseudo', 'shinime_avatar', 'shinime_banner',
+        'shinime_theme', 'shinime_accent_color'
+    ];
+
+    keysToExport.forEach(key => {
+        const data = localStorage.getItem(key);
+        if (data !== null) {
+            userData[key] = data;
+        }
+    });
+
+    const blob = new Blob([JSON.stringify(userData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `mon-profil-shinime_${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showNotification("Données exportées avec succès !", "success");
+}
+
+function importUserData(event) {
+    const file = event.target.files[0];
+    if (!file) {
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const userData = JSON.parse(e.target.result);
+            if (confirm("Attention : L'importation va écraser toutes vos données actuelles. Voulez-vous continuer ?")) {
+                Object.keys(userData).forEach(key => {
+                    localStorage.setItem(key, userData[key]);
+                });
+                showNotification("Données importées avec succès ! La page va se recharger.", "success");
+                
+                // Recharge la page pour que tous les changements s'appliquent
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            }
+        } catch (error) {
+            showNotification("Erreur : Le fichier est invalide ou corrompu.", "error");
+            console.error("Erreur d'importation :", error);
+        }
+    };
+    reader.readAsText(file);
+}
 // =================================================================================
 // --- 3. FONCTIONS D'AFFICHAGE (DISPLAY) ---
 // =================================================================================
 // Dans script.js, section 3
 // Dans script.js, section 3
-console.log('La fonction showNotification est appelée !');
+// Dans script.js, section 3
+function displayTop5() {
+    const list = document.getElementById('topAnimesList');
+    if (!list) return;
+
+    const top5Ids = getTop5();
+    const top5Animes = top5Ids.map(id => animes.find(a => a.id === id)).filter(Boolean);
+
+    list.innerHTML = '';
+    if (top5Animes.length === 0) {
+        list.innerHTML = '<p style="color: #888;">Votre Top 5 est vide. Cliquez sur "Modifier" pour le créer !</p>';
+        return;
+    }
+
+    top5Animes.forEach(anime => {
+        const item = document.createElement('li');
+        item.className = 'top-animes-item';
+        item.innerHTML = `
+            <img src="${anime.img}" alt="${anime.title}" loading="lazy">
+            <span class="top-animes-item-title">${anime.title}</span>
+        `;
+        list.appendChild(item);
+    });
+}
+function displayDashboard() {
+    const grid = document.getElementById('dashboardGrid');
+    if (!grid) return;
+
+    const history = JSON.parse(localStorage.getItem('animeHistory') || '[]');
+    const progress = JSON.parse(localStorage.getItem('animeProgress') || '{}');
+    let dashboardItems = [];
+
+    // On parcourt l'historique pour garder l'ordre récent
+    for (const animeId of history) {
+        if (progress[animeId] !== undefined) {
+            const anime = animes.find(a => a.id === animeId);
+            if (anime) {
+                const lastWatchedIndex = progress[animeId];
+                // On vérifie si l'animé n'est pas terminé
+                if (lastWatchedIndex < anime.episodeUrls.length - 1) {
+                    dashboardItems.push(anime);
+                }
+            }
+        }
+    }
+
+    // On limite aux 4 animés les plus récents à reprendre
+    dashboardItems = dashboardItems.slice(0, 4);
+    
+    grid.innerHTML = '';
+    if (dashboardItems.length > 0) {
+        document.getElementById('dashboard').style.display = 'block';
+        dashboardItems.forEach(anime => {
+            const lastWatchedIndex = progress[anime.id];
+            const nextEpisodeIndex = lastWatchedIndex + 1;
+            const nextEpisodeNumber = nextEpisodeIndex + 1;
+
+            const card = document.createElement('div');
+            card.className = 'dashboard-card';
+            card.innerHTML = `
+                <img src="${anime.img}" alt="${anime.title}" class="dashboard-card-img">
+                <div class="dashboard-card-info">
+                    <h4 class="dashboard-card-title">${anime.title}</h4>
+                    <button class="resume-btn">▶ Reprendre l'épisode ${nextEpisodeNumber}</button>
+                </div>
+            `;
+
+            card.querySelector('.resume-btn').onclick = () => {
+                openAnimeModal(anime, nextEpisodeIndex);
+            };
+
+            grid.appendChild(card);
+        });
+    } else {
+        // S'il n'y a rien à reprendre, on cache toute la section
+        document.getElementById('dashboard').style.display = 'none';
+    }
+}
 function showNotification(message, type = 'info') {
     const container = document.getElementById('notification-container');
     if (!container) return;
@@ -479,7 +616,9 @@ function displayAllGrids() {
 	displayAnimes(watchlistAnimes, document.getElementById('watchlistGrid'));
 	displayAnimes(ecchiList, document.getElementById('ecchiGrid'));
 	displayAnimes(animesDuJour, document.getElementById('sortieJourGrid'));
+    displayDashboard();
 	updateProfileStats();
+    
 }
 
 // Place ces 3 fonctions dans script.js (par exemple, à la fin de la section 3)
@@ -565,7 +704,128 @@ function checkAllAchievements() {
 // =================================================================================
 // Dans script.js, section 4 (FONCTIONS MODALES)
 // Dans script.js, section 4 (FONCTIONS MODALES)
+// Dans admin.js, remplace toute la fonction openTop5EditorModal par celle-ci
 
+function openTop5EditorModal() {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.onclick = () => document.body.removeChild(overlay);
+
+    const modalContent = document.createElement('div');
+    modalContent.className = 'top5-editor-modal-content';
+    modalContent.onclick = e => e.stopPropagation();
+    modalContent.innerHTML = `
+        <h3 style="color:var(--accent-color, #00ffe5);">Éditeur du Top 5</h3>
+        <p style="color:#aaa;">Glissez-déposez vos animés favoris de gauche à droite. Double-cliquez sur un animé du Top 5 pour le retirer.</p>
+        <div class="top5-editor-container">
+            <div class="favorites-column">
+                <h4>Mes Favoris</h4>
+                <div id="favorites-list-editor" class="favorites-list"></div>
+            </div>
+            <div class="top5-column">
+                <h4>
+                    Mon Top 5
+                    <button id="clear-top5-btn">Vider</button>
+                </h4>
+                <div id="top5-list-editor" class="top5-list-editor"></div>
+            </div>
+        </div>
+    `;
+
+    overlay.appendChild(modalContent);
+    document.body.appendChild(overlay);
+
+    const favoritesListEl = document.getElementById('favorites-list-editor');
+    const top5ListEl = document.getElementById('top5-list-editor');
+
+    const favorites = animes.filter(a => getFavorites().has(a.id));
+    
+    // Fonction pour créer une carte d'animé (draggable)
+    const createDraggableCard = (anime) => {
+        const card = document.createElement('div');
+        card.className = 'editor-anime-card';
+        card.draggable = true;
+        card.dataset.id = anime.id;
+        card.innerHTML = `<img src="${anime.img}" alt="${anime.title}"><span>${anime.title}</span>`;
+        
+        card.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', anime.id);
+            setTimeout(() => card.classList.add('dragging'), 0);
+        });
+        card.addEventListener('dragend', () => card.classList.remove('dragging'));
+        
+        return card;
+    };
+
+    // Fonction pour peupler les listes
+    const populateLists = () => {
+        favoritesListEl.innerHTML = '';
+        top5ListEl.innerHTML = '';
+        const top5Ids = getTop5();
+
+        favorites.forEach(anime => favoritesListEl.appendChild(createDraggableCard(anime)));
+        
+        top5Ids.forEach(id => {
+            const anime = animes.find(a => a.id === id);
+            if (anime) {
+                const card = createDraggableCard(anime);
+                // NOUVEAU : Double-clic pour supprimer
+                card.addEventListener('dblclick', () => {
+                    card.remove();
+                    saveAndRefresh();
+                });
+                top5ListEl.appendChild(card);
+            }
+        });
+    };
+    
+    // Fonction pour sauvegarder et rafraîchir
+    const saveAndRefresh = () => {
+        const newTop5Ids = [...top5ListEl.children].map(card => parseInt(card.dataset.id, 10));
+        saveTop5(newTop5Ids);
+        displayTop5(); // Rafraîchit l'affichage sur la page de profil en arrière-plan
+    };
+
+    // Logique du Drag and Drop
+    const handleDragOver = (e) => {
+        e.preventDefault();
+    };
+
+    const handleDrop = (e) => {
+        e.preventDefault();
+        const animeId = parseInt(e.dataTransfer.getData('text/plain'), 10);
+        const anime = animes.find(a => a.id === animeId);
+        
+        if (top5ListEl.children.length >= 5) {
+            showNotification("Vous ne pouvez avoir que 5 animés dans votre Top 5.", "error");
+            return;
+        }
+        if (top5ListEl.querySelector(`[data-id="${animeId}"]`)) return;
+
+        const card = createDraggableCard(anime);
+        // NOUVEAU : Double-clic pour supprimer (aussi pour les nouveaux éléments)
+        card.addEventListener('dblclick', () => {
+            card.remove();
+            saveAndRefresh();
+        });
+        top5ListEl.appendChild(card);
+        saveAndRefresh();
+    };
+
+    top5ListEl.addEventListener('dragover', handleDragOver);
+    top5ListEl.addEventListener('drop', handleDrop);
+    
+    // NOUVEAU : Logique du bouton "Vider"
+    document.getElementById('clear-top5-btn').onclick = () => {
+        if (confirm("Voulez-vous vraiment vider votre Top 5 ?")) {
+            top5ListEl.innerHTML = '';
+            saveAndRefresh();
+            showNotification("Top 5 vidé !", "success");
+        }
+    };
+    
+    populateLists(); // Affiche les listes au début
+}
 function openQuizModal() {
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
@@ -746,236 +1006,240 @@ function openBannerModal() {
 
 // In script.js
 
-function openAnimeModal(anime) {
+// Dans script.js, remplace toute la fonction openAnimeModal par celle-ci
+
+// Dans script.js, remplacez toute la fonction openAnimeModal par celle-ci
+
+function openAnimeModal(anime, startAtEpisodeIndex = null) {
+    // Crée l'arrière-plan gris semi-transparent
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.onclick = () => document.body.removeChild(overlay);
 
+    // Crée la fenêtre modale principale
     const modal = document.createElement('div');
     modal.className = 'modal';
     modal.onclick = (e) => e.stopPropagation();
 
+    // Crée le bouton pour fermer
     const closeBtn = document.createElement('button');
     closeBtn.className = 'modal-close';
     closeBtn.textContent = '×';
     closeBtn.onclick = () => document.body.removeChild(overlay);
 
-    const modalCenter = document.createElement('div');
-    modalCenter.className = 'modal-center';
-    
-    // NOUVEAU : Crée un conteneur pour les boutons de sélection du lecteur
-    const playerSelectorContainer = document.createElement('div');
-    playerSelectorContainer.className = 'player-selector-container';
-
-    const iframe = document.createElement('iframe');
-    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
-    iframe.allowFullscreen = true;
-    
-    modalCenter.appendChild(playerSelectorContainer); // Ajoute le conteneur AVANT l'iframe
-    modalCenter.appendChild(iframe);
-
+    // --- Colonne de gauche (Liste des épisodes) ---
     const modalLeft = document.createElement('div');
     modalLeft.className = 'modal-left';
+
+    // --- Colonne du centre (Lecteur vidéo) ---
+    const modalCenter = document.createElement('div');
+    modalCenter.className = 'modal-center';
+    const playerSelectorContainer = document.createElement('div');
+    playerSelectorContainer.className = 'player-selector-container';
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('allowFullScreen', '');
+    modalCenter.appendChild(playerSelectorContainer);
+    modalCenter.appendChild(iframe);
     
-    // NOUVEAU : Fonction pour mettre à jour les lecteurs et l'iframe
-    function updatePlayers(episodeIndex) {
-        // Vide les anciens boutons de lecteur
+    // --- Colonne de droite (Infos et animes similaires) ---
+    const modalRight = document.createElement('div');
+    modalRight.className = 'modal-right';
+
+    // Ajout de l'image de l'anime
+    const img = document.createElement('img');
+    img.src = anime.img;
+    img.alt = anime.title;
+    modalRight.appendChild(img);
+
+    // Ajout du titre de l'anime
+    const title = document.createElement('h3');
+    title.textContent = anime.title;
+    modalRight.appendChild(title);
+
+    // Ajout des genres
+    const genresDiv = document.createElement('div');
+    genresDiv.style.display = 'flex';
+    genresDiv.style.gap = '0.5rem';
+    genresDiv.style.flexWrap = 'wrap';
+    if (anime.genres) {
+        anime.genres.forEach(genre => {
+            const genreTag = document.createElement('span');
+            genreTag.textContent = genre;
+            genreTag.style.background = '#333';
+            genreTag.style.padding = '0.2rem 0.5rem';
+            genreTag.style.borderRadius = '4px';
+            genreTag.style.fontSize = '0.85rem';
+            genresDiv.appendChild(genreTag);
+        });
+    }
+    modalRight.appendChild(genresDiv);
+    
+    // --- Logique pour changer d'épisode et de lecteur ---
+    let currentEpisodeIndex = 0;
+    
+    function loadEpisode(epIndex) {
+        currentEpisodeIndex = epIndex;
+        const episode = anime.episodeUrls[epIndex];
+        const watchedEpisodes = getWatchedEpisodes(anime.id);
+
+        // Met à jour les boutons d'épisodes (style "actif")
+        modalLeft.querySelectorAll('.ep-btn').forEach((btn, index) => {
+            btn.classList.toggle('active', index === epIndex);
+        });
+
+        // Met à jour les boutons de lecteur
         playerSelectorContainer.innerHTML = '';
-        const players = anime.episodeUrls[episodeIndex];
-
-        if (!players || players.length === 0) {
-            iframe.src = ''; // Pas de lecteur pour cet épisode
-            return;
-        }
-
-        // Crée un bouton pour chaque lecteur disponible
-        players.forEach((player, playerIndex) => {
+        episode.forEach((player, playerIndex) => {
             const playerBtn = document.createElement('button');
             playerBtn.className = 'player-btn';
-            playerBtn.textContent = player.name || `Lecteur ${playerIndex + 1}`;
+            playerBtn.textContent = player.name;
             playerBtn.onclick = () => {
                 iframe.src = player.url;
-                // Met en surbrillance le bouton du lecteur actif
-                playerSelectorContainer.querySelectorAll('.player-btn').forEach(btn => btn.classList.remove('active'));
+                playerSelectorContainer.querySelectorAll('.player-btn').forEach(pBtn => pBtn.classList.remove('active'));
                 playerBtn.classList.add('active');
             };
             playerSelectorContainer.appendChild(playerBtn);
         });
 
-        // Charge automatiquement le premier lecteur et active son bouton
-        iframe.src = players[0].url;
-        playerSelectorContainer.querySelector('.player-btn').classList.add('active');
-    }
+        // Charge le premier lecteur par défaut
+        if (playerSelectorContainer.firstChild) {
+            playerSelectorContainer.firstChild.click();
+        }
 
-    const watchedEpisodes = getWatchedEpisodes(anime.id);
-
-    if (Array.isArray(anime.episodeUrls)) {
-        anime.episodeUrls.forEach((episodePlayers, idx) => {
-            if (!episodePlayers || episodePlayers.length === 0) return;
-
-            const entry = document.createElement('div');
-            entry.className = 'episode-entry';
-
-            const epBtn = document.createElement('button');
-            epBtn.className = 'ep-btn';
-            epBtn.textContent = `Épisode ${idx + 1}`;
-
-            const watchedBtn = document.createElement('button');
-            watchedBtn.className = 'mark-watched-btn';
-            watchedBtn.innerHTML = '👁️';
-            watchedBtn.title = 'Marquer comme vu/non vu';
-
-            if (watchedEpisodes.has(idx)) {
-                entry.classList.add('is-watched');
-            }
+        // Marque l'épisode comme vu
+        if (!watchedEpisodes.has(epIndex + 1)) {
+            watchedEpisodes.add(epIndex + 1);
+            saveWatchedEpisodes(anime.id, watchedEpisodes);
             
-            // MODIFIÉ : Le clic sur un épisode met maintenant à jour les lecteurs disponibles
-            epBtn.addEventListener('click', () => {
-                updatePlayers(idx); // Appelle la nouvelle fonction
-                
-                modalLeft.querySelectorAll('.ep-btn').forEach(b => b.classList.remove('active'));
-                epBtn.classList.add('active');
-                
-                let progress = JSON.parse(localStorage.getItem('animeProgress') || '{}');
-                progress[anime.id] = idx;
-                localStorage.setItem('animeProgress', JSON.stringify(progress));
-                displayAllGrids();
-            });
+            // Met à jour le bouton "marquer comme vu"
+            const epEntry = modalLeft.querySelector(`[data-episode-index="${epIndex}"]`);
+            if (epEntry) {
+                epEntry.classList.add('is-watched');
+                epEntry.querySelector('.mark-watched-btn').innerHTML = '✔️';
+            }
+             checkAllAchievements(); // Vérifie les succès après avoir regardé un épisode
+        }
+    }
+    
+    // Remplissage de la liste des épisodes
+    const watchedEpisodes = getWatchedEpisodes(anime.id);
+    anime.episodeUrls.forEach((ep, index) => {
+        const isWatched = watchedEpisodes.has(index + 1);
+        const episodeEntry = document.createElement('div');
+        episodeEntry.className = `episode-entry ${isWatched ? 'is-watched' : ''}`;
+        episodeEntry.dataset.episodeIndex = index;
 
-            watchedBtn.addEventListener('click', () => {
-                const currentWatched = getWatchedEpisodes(anime.id);
-                currentWatched.has(idx) ? currentWatched.delete(idx) : currentWatched.add(idx);
-                saveWatchedEpisodes(anime.id, currentWatched);
-                entry.classList.toggle('is-watched');
-                checkAllAchievements();
-            });
-
-            entry.appendChild(epBtn);
-            entry.appendChild(watchedBtn);
-            modalLeft.appendChild(entry);
-        });
+        const epBtn = document.createElement('button');
+        epBtn.className = 'ep-btn';
+        epBtn.textContent = `Épisode ${index + 1}`;
+        epBtn.onclick = () => loadEpisode(index);
         
-        // Active le premier bouton d'épisode et charge ses lecteurs par défaut
-        if (anime.episodeUrls.length > 0) {
-            updatePlayers(0);
-            const firstEpBtn = modalLeft.querySelector('.ep-btn');
-            if (firstEpBtn) firstEpBtn.classList.add('active');
-        }
+        const markWatchedBtn = document.createElement('button');
+        markWatchedBtn.className = 'mark-watched-btn';
+        markWatchedBtn.innerHTML = isWatched ? '✔️' : '👁️';
+        markWatchedBtn.title = isWatched ? 'Marquer comme non vu' : 'Marquer comme vu';
+        
+        markWatchedBtn.onclick = (e) => {
+            e.stopPropagation();
+            const currentWatched = getWatchedEpisodes(anime.id);
+            if (currentWatched.has(index + 1)) {
+                currentWatched.delete(index + 1);
+                episodeEntry.classList.remove('is-watched');
+                markWatchedBtn.innerHTML = '👁️';
+            } else {
+                currentWatched.add(index + 1);
+                episodeEntry.classList.add('is-watched');
+                markWatchedBtn.innerHTML = '✔️';
+            }
+            saveWatchedEpisodes(anime.id, currentWatched);
+            checkAllAchievements();
+        };
 
-    }
-
-    // Le reste de la fonction (modalRight, description, etc.) ne change pas...
-    const modalRight = document.createElement('div');
-    modalRight.className = 'modal-right';
-    const smallImg = document.createElement('img');
-    smallImg.src = anime.img;
-    smallImg.alt = anime.title;
-    modalRight.appendChild(smallImg);
-
-    const infoContainer = document.createElement('div');
-    infoContainer.style.width = '100%';
-    infoContainer.innerHTML = `
-        <p><b>Genres :</b> ${anime.genres.join(', ')}</p>
-        <p><b>Année :</b> ${anime.year || 'Inconnue'}</p>
-        <p><b>Épisodes :</b> ${anime.episodes || 'Inconnu'}</p>
-		<p><b>Statut :</b> ${anime.statut} </p>
-    `;
-    modalRight.appendChild(infoContainer);
-
-    const adjacentSeasons = findAdjacentSeasons(anime);
-    if (adjacentSeasons.prev || adjacentSeasons.next) {
-        const seasonNavContainer = document.createElement('div');
-        seasonNavContainer.className = 'season-nav-container';
-
-        if (adjacentSeasons.prev) {
-            const prevBtn = document.createElement('button');
-            prevBtn.className = 'season-nav-btn';
-            prevBtn.innerHTML = `&larr; Saison ${adjacentSeasons.prev.title.match(/Saison (\d+)/i)[1]}`;
-            prevBtn.onclick = () => {
-                document.body.removeChild(overlay);
-                openAnimeModal(adjacentSeasons.prev);
-            };
-            seasonNavContainer.appendChild(prevBtn);
-        }
-
-        if (adjacentSeasons.next) {
-            const nextBtn = document.createElement('button');
-            nextBtn.className = 'season-nav-btn';
-            nextBtn.innerHTML = `Saison ${adjacentSeasons.next.title.match(/Saison (\d+)/i)[1]} &rarr;`;
-            nextBtn.onclick = () => {
-                document.body.removeChild(overlay);
-                openAnimeModal(adjacentSeasons.next);
-            };
-            seasonNavContainer.appendChild(nextBtn);
-        }
-        modalRight.appendChild(seasonNavContainer);
-    }
-
+        episodeEntry.appendChild(epBtn);
+        episodeEntry.appendChild(markWatchedBtn);
+        modalLeft.appendChild(episodeEntry);
+    });
+    
+    // --- Animes Similaires ---
     const similarAnimes = findSimilarAnimes(anime, 3);
     if (similarAnimes.length > 0) {
         const similarTitle = document.createElement('h4');
         similarTitle.className = 'similar-title';
         similarTitle.textContent = 'Vous pourriez aussi aimer';
         modalRight.appendChild(similarTitle);
+
         const similarContainer = document.createElement('div');
         similarContainer.className = 'similar-container';
-        similarAnimes.forEach(simAnime => {
-            const simCard = document.createElement('div');
-            simCard.className = 'similar-anime-card';
-            simCard.innerHTML = `<img src="${simAnime.img}" alt="${simAnime.title}"><div class="similar-anime-title">${simAnime.title}</div>`;
-            simCard.onclick = () => {
-                document.body.removeChild(overlay);
-                openAnimeModal(simAnime);
+        similarAnimes.forEach(similar => {
+            const card = document.createElement('div');
+            card.className = 'similar-anime-card';
+            card.innerHTML = `
+                <img src="${similar.img}" alt="${similar.title}" loading="lazy">
+                <span class="similar-anime-title">${similar.title}</span>
+            `;
+            card.onclick = () => {
+                document.body.removeChild(overlay); // Ferme la modale actuelle
+                openAnimeModal(similar); // Ouvre la nouvelle
             };
-            similarContainer.appendChild(simCard);
+            similarContainer.appendChild(card);
         });
         modalRight.appendChild(similarContainer);
     }
 
-    const desc = document.createElement('p');
-    desc.className = 'modal-description';
-    desc.textContent = anime.description || '';
-
+    // --- Structure finale du modal ---
     const modalTopContent = document.createElement('div');
     modalTopContent.className = 'modal-top-content';
     modalTopContent.appendChild(modalLeft);
     modalTopContent.appendChild(modalCenter);
     modalTopContent.appendChild(modalRight);
 
+    const modalBottomContent = document.createElement('div');
+    modalBottomContent.className = 'modal-bottom-content';
+    
+    // Ajout de la description
+    const desc = document.createElement('p');
+    desc.className = 'modal-description';
+    desc.textContent = anime.description || 'Aucune description disponible.';
+    modalBottomContent.appendChild(desc);
+
+    // NOUVEAU : Ajout de l'élément pour Disqus
+    const disqusContainer = document.createElement('div');
+    disqusContainer.id = 'disqus_thread';
+    disqusContainer.style.padding = '0 1.5rem 1.5rem 1.5rem'; // Un peu d'espace
+    modalBottomContent.appendChild(disqusContainer);
+
     modal.appendChild(closeBtn);
     modal.appendChild(modalTopContent);
-    modal.appendChild(desc);
+    modal.appendChild(modalBottomContent);
 
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
-
+    
+    // Gère l'historique et la barre latérale
     addToHistory(anime.id);
     displayHistorySidebar();
-}
 
-function openAvatarModal() {
-	const overlay = document.createElement('div');
-	overlay.className = 'modal-overlay';
-	overlay.onclick = () => document.body.removeChild(overlay);
-	const modalContent = document.createElement('div');
-	modalContent.className = 'avatar-modal-content';
-	modalContent.innerHTML = '<h3>Choisissez votre avatar</h3>';
-	const avatarGrid = document.createElement('div');
-	avatarGrid.className = 'avatar-selection-grid';
-	availableAvatars.forEach(avatarUrl => {
-		const avatarImg = document.createElement('img');
-		avatarImg.src = avatarUrl;
-		avatarImg.className = 'avatar-choice';
-		avatarImg.onclick = () => {
-			localStorage.setItem('shinime_avatar', avatarUrl);
-			document.getElementById('user-avatar').src = avatarUrl;
-			document.body.removeChild(overlay);
-		};
-		avatarGrid.appendChild(avatarImg);
-	});
-	modalContent.appendChild(avatarGrid);
-	overlay.appendChild(modalContent);
-	document.body.appendChild(overlay);
+    // Charge le premier épisode ou celui spécifié
+    loadEpisode(startAtEpisodeIndex !== null ? startAtEpisodeIndex : 0);
+    
+    // NOUVEAU : Configuration et chargement du script Disqus
+    var disqus_config = function () {
+        // On crée une URL unique pour chaque page d'anime pour que les commentaires soient séparés
+        this.page.url = window.location.href.split('#')[0] + '#!/anime/' + anime.id;
+        this.page.identifier = 'anime-' + anime.id; // Un identifiant unique pour chaque anime
+    };
+    
+    // On supprime l'ancien script Disqus s'il existe pour en charger un nouveau
+    const oldScript = document.getElementById('disqus-script');
+    if (oldScript) oldScript.remove();
+
+    (function() { 
+        var d = document, s = d.createElement('script');
+        s.id = 'disqus-script'; // On donne un id pour pouvoir le retrouver et le supprimer plus tard
+        s.src = 'https://shinime-2.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
 }
 
 function openPlanningModal() {
@@ -1247,16 +1511,36 @@ if (randomBtn) {
                             localStorage.removeItem(storageKey);
                             displayAllGrids();
                             showNotification(`La liste "${listName}" a été vidée.`, 'success');
+
                         }
+                        
                     };
                 };
                 setupClearButton('clear-watchlist-btn', 'shinime_watchlist', 'Watchlist');
                 setupClearButton('clear-reprendre-btn', 'animeProgress', 'Reprendre');
                 setupClearButton('clear-favoris-btn', 'animeFavorites', 'Favoris');
-
                 displayPseudo();
                 displayAvatar();
                 displayBanner();
+                updateProfileStats();
+                displayDashboard();
+                const exportBtn = document.getElementById('export-data-btn');
+const importInput = document.getElementById('import-file-input');
+
+if (exportBtn) {
+    exportBtn.onclick = exportUserData;
+}
+if (importInput) {
+    importInput.onchange = importUserData;
+}
+
+ displayTop5(); // Affiche le Top 5 au chargement de la page
+
+    const editTop5Btn = document.getElementById('edit-top5-btn');
+    if (editTop5Btn) {
+        editTop5Btn.onclick = openTop5EditorModal;
+    }
+
             }
 
             // --- Sortie du jour Titre ---

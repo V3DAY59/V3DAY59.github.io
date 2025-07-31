@@ -49,6 +49,7 @@
       </div>
     </header>
     <main>
+      
 <div class="profile-card">
   <div id="user-banner" title="Changer la bannière"></div>
   <div id="profil-header">
@@ -62,6 +63,14 @@
   <h3 class="section-title" style="border:none; margin-bottom: 1rem;">Mes Trophées</h3>
   <div class="trophies-grid" id="trophiesGrid">
     </div>
+</section>
+<section id="user-top-animes">
+  <h3 class="section-title">
+    Mon Top 5 Animés
+    <button id="edit-top5-btn" class="edit-btn">✏️ Modifier</button>
+  </h3>
+  <ol class="top-animes-list" id="topAnimesList">
+    </ol>
 </section>
   <h3 class="section-title" style="border:none; margin-bottom: 1rem;">Mon Activité</h3>
   <div class="stats-container">
@@ -84,6 +93,14 @@
     </div>
 
   </div>
+<section id="data-management">
+    <h3 class="section-title" style="border:none; margin-bottom: 1rem;">Gestion de mes Données</h3>
+    <div class="data-buttons-container">
+        <button id="export-data-btn" class="data-btn export">📥 Exporter mes données</button>
+        <label for="import-file-input" class="data-btn import">📤 Importer mes données</label>
+        <input type="file" id="import-file-input" style="display: none;" accept=".json">
+    </div>
+</section>
 </section>
 <section id="watchlist">
   <h2 class="section-title">
@@ -183,6 +200,7 @@
         <p style="color:#aaa;font-size:0.95em;margin-top:1.2rem;"> La responsabilité de l’accès à ce contenu incombe à l’utilisateur. <br> Shinime.fr ne collecte aucune donnée d’âge et ne peut garantir la véracité de la déclaration. </p>
       </div>
     </div>
+    <script id="dsq-count-scr" src="//shinime-2.disqus.com/count.js" async></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="script.js"></script>
   </body>
